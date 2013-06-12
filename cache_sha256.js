@@ -32,14 +32,11 @@ c[d+n]|0;else{var r=a[n-15],g=a[n-2];a[n]=((r<<25|r>>>7)^(r<<14|r>>>18)^r>>>3)+a
 d[e>>>5]|=128<<24-e%32;d[(e+64>>>9<<4)+14]=h.floor(b/4294967296);d[(e+64>>>9<<4)+15]=b;a.sigBytes=4*d.length;this._process();return this._hash},clone:function(){var a=g.clone.call(this);a._hash=this._hash.clone();return a}});s.SHA256=g._createHelper(f);s.HmacSHA256=g._createHmacHelper(f)})(Math);
 (function(){var h=CryptoJS,j=h.lib.WordArray;h.enc.Base64={stringify:function(b){var e=b.words,f=b.sigBytes,c=this._map;b.clamp();b=[];for(var a=0;a<f;a+=3)for(var d=(e[a>>>2]>>>24-8*(a%4)&255)<<16|(e[a+1>>>2]>>>24-8*((a+1)%4)&255)<<8|e[a+2>>>2]>>>24-8*((a+2)%4)&255,g=0;4>g&&a+0.75*g<f;g++)b.push(c.charAt(d>>>6*(3-g)&63));if(e=c.charAt(64))for(;b.length%4;)b.push(e);return b.join("")},parse:function(b){var e=b.length,f=this._map,c=f.charAt(64);c&&(c=b.indexOf(c),-1!=c&&(e=c));for(var c=[],a=0,d=0;d<
 e;d++)if(d%4){var g=f.indexOf(b.charAt(d-1))<<2*(d%4),h=f.indexOf(b.charAt(d))>>>6-2*(d%4);c[a>>>2]|=(g|h)<<24-8*(a%4);a++}return j.create(c,a)},_map:"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="}})();
-/*
-CryptoJS v3.1.2
-code.google.com/p/crypto-js
-(c) 2009-2013 by Jeff Mott. All rights reserved.
-code.google.com/p/crypto-js/wiki/License
-*/
 (function(){if("function"==typeof ArrayBuffer){var b=CryptoJS.lib.WordArray,e=b.init;(b.init=function(a){a instanceof ArrayBuffer&&(a=new Uint8Array(a));if(a instanceof Int8Array||a instanceof Uint8ClampedArray||a instanceof Int16Array||a instanceof Uint16Array||a instanceof Int32Array||a instanceof Uint32Array||a instanceof Float32Array||a instanceof Float64Array)a=new Uint8Array(a.buffer,a.byteOffset,a.byteLength);if(a instanceof Uint8Array){for(var b=a.byteLength,d=[],c=0;c<b;c++)d[c>>>2]|=a[c]<<
 24-8*(c%4);e.call(this,d,b)}else e.apply(this,arguments)}).prototype=b}})();
+
+
+
 
 /*
  * DOMParser HTML extension
@@ -88,42 +85,6 @@ code.google.com/p/crypto-js/wiki/License
     };
 }(DOMParser));
 
-
-
-/**
-* Creates and returns a blob from a data URL (either base64 encoded or not).
-*
-* @param {string} dataURL The data URL to convert.
-* @return {Blob} A blob representing the array buffer data.
-* from https://github.com/ebidel/filer.js (Apache)
-*/
-function dataURLToBlob (dataURL) {
-    var BASE64_MARKER = ';base64,';
-    if (dataURL.indexOf(BASE64_MARKER) == -1) {
-      var parts = dataURL.split(',');
-      var contentType = parts[0].split(':')[1];
-      var raw = parts[1];
-
-      return new Blob([raw], {type: contentType});
-    }
-
-    var parts = dataURL.split(BASE64_MARKER);
-    var contentType = parts[0].split(':')[1];
-    var raw = window.atob(parts[1]);
-    var rawLength = raw.length;
-
-    var uInt8Array = new Uint8Array(rawLength);
-
-    for (var i = 0; i < rawLength; ++i) {
-      uInt8Array[i] = raw.charCodeAt(i);
-    }
-
-    return new Blob([uInt8Array], {type: contentType});
-  }
-
-
-
-
 function isEmpty(value){
   return (value === undefined || value == null || value.length === 0);
 }
@@ -163,6 +124,7 @@ function cache_sha256_load(){
     }
 }
 
+
 // Now that we have the cache loaded, here's a function to act on every element that will use the cache.
 function cache_sha256_elemActor(elem)
 {
@@ -174,66 +136,56 @@ function cache_sha256_elemActor(elem)
     var url = elem.src;
     cache_sha256_load();
     cache_sha256_hash = elem.getAttribute('cache_sha256');
-    if (! window.cache_sha256_data['cache_sha256_hash'] )
+
+
+    // Do we have a hash stored
+    if (window.cache_sha256_data[cache_sha256_hash])
+    {
+        alert("Potentially already stored...");
+        // is it a valid hash?
+        var b64 = window.cache_sha256_data[cache_sha256_hash];
+        orig  = CryptoJS.enc.Base64.parse(b64);
+        alert(result);
+        var hash =  CryptoJS.SHA256(result);
+        alert("restored hash " + hash);
+        if (hash == cache_sha256_hash)
+        {
+            b64 = CryptoJS.enc.Base64.stringify(words);
+            var data_url = "data:image/png;base64," + b64;
+            elem.src = data_url;
+            alert("Using cached version!");
+            elem.alreadyset = "True"; 
+        }
+    }
+    if ( elem.alreadyset != "True" )
     {
         // Pull in our object over a XMLHttpRequest
-
-        BlobBuilder             = window.MozBlobBuilder || window.WebKitBlobBuilder || window.BlobBuilder;
         var request             = new XMLHttpRequest();
         request.open ("GET", url, true);
-        request.responseType    = "blob";
+        request.overrideMimeType('text\/plain; charset=x-user-defined');
         request.send (null);
-        
+        var data_url = "";
         request.onload = function(e)
         {
             if (this.status === 200) 
             {
-                var blob = new Blob([this.response], {type: 'image/png'});
 
-                var reader = new FileReader();
-                reader.readAsBinaryString(blob) ;
-                reader.onloadend = function(evt)
-		{
-                	var sha256 = CryptoJS.algo.SHA256.create();
-	                sha256.update(CryptoJS.enc.Latin1.parse(evt.target.result));
-                	var hash = sha256.finalize();
-                
-			// Now, save it for next time.	
-			var reader2 = new FileReader();
-                	reader2.readAsDataURL(blob);
-                	reader2.onloadend = function(evt)
-                	{
-                        	elem.src = evt.target.result;
-                        	window.cache_sha256_data['cache_sha256_hash'][hash] = evt.target.result;
-                        	cache_sha256_save(window.cache_sha256_data);
-                	};
-		};
-
+                var result ="";
+                for (var i=0; i<=request.responseText.length-1; i++)
+                    result += String.fromCharCode(request.responseText.charCodeAt(i) & 0xff);
+                var hash =  CryptoJS.SHA256(result);
+                alert(result);
+                alert("orig hash" + hash);
+                words  = CryptoJS.enc.Latin1.parse(result);
+                b64 = CryptoJS.enc.Base64.stringify(words);
+                data_url = "data:image/png;base64," + b64;
+                window.cache_sha256_data[hash] = b64;
+                cache_sha256_save(window.cache_sha256_data);
+                elem.src = data_url;
+                elem.alreadyset = "True";
             }
-	}
-    }
-    else
-    {
-	// If it's already saved, make sure it's right, then use it. 
-        elem.src = window.cache_sha256_data['cache_sha256_hash'];
-        blob = dataURLToBlob(window.cache_sha256_data['cache_sha256_hash']);
- 	var reader = new FileReader();
-        reader.readAsBinaryString(blob) ;
-        reader.onloadend = function(evt)
-        {
-            var sha256 = CryptoJS.algo.SHA256.create();
-            sha256.update(CryptoJS.enc.Latin1.parse(evt.target.result));
-            var hash = sha256.finalize();
-            if (hash == elem.getAttribute('cache_sha256')) 
-		{
-		 	elem.src = window.cache_sha256_data['cache_sha256_hash'];
-			alert("Using cached version!");
-		}
         };
-
-        cache_sha256_save(window.cache_sha256_data);
     }
-    elem.alreadyset = "True"; // Don't run more than once/element
 }
 
 
